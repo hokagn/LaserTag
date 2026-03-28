@@ -2,7 +2,6 @@
 
 
 #include "BlockRule.h"
-#include "MapGraph.h"
 
 bool UBlockRule::RuleCheck_Implementation(UMapGraph* Graph, FMapVector Center)
 {

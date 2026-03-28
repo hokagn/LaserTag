@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include <MapGraph.h>
 #include <RoomBlock.h>
+#include "BlockData.h"
 #include <BlockRule.h>
 #include <FixedSize3DArray.h>
 #include "Engine/DataAsset.h"
@@ -60,20 +61,20 @@ public:
 	//Returns true if the position is occupied or out of bounds
 	bool GetIsOccupied(FMapVector ijk)
 	{
-		return OccupiedArray->Get(ijk.x + NegEnd.x, ijk.h + NegEnd.h, ijk.z + NegEnd.z);
+		return GetIsOccupied(ijk.x, ijk.h, ijk.z);
 	}
 	//Returns true if the position is occupied or out of bounds
 	bool GetIsOccupied(int x, int h, int z)
 	{
-		x += NegEnd.x;
-		h += NegEnd.h;
-		z += NegEnd.z;
+		x += abs(NegEnd.x);
+		h += abs(NegEnd.h);
+		z += abs(NegEnd.z);
 		FMapVector Size = PosEnd + NegEnd;
 		if (x > Size.x || h > Size.h || z > Size.z || x < 0 || h < 0 || z < 0)
 		{
 			return true;
 		}
-		return OccupiedArray->Get(x, h + NegEnd.h, z + NegEnd.z);
+		return !(OccupiedArray->Get(x, h, z));
 	}
 
 protected:

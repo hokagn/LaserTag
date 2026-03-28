@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BlockData.h"
 #include "UObject/Object.h"
 #include "BlockRule.generated.h"
 

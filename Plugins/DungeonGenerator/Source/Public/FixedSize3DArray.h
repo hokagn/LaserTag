@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include <MapGraph.h>
+#include "BlockData.h"
 #include "FixedSize3DArray.generated.h"
 
 /**
@@ -23,6 +23,7 @@ public:
 		Size.x = x > 0 ? x : 1;
 		Size.h = h > 0 ? h : 1;
 		Size.z = z > 0 ? z : 1 ;
+		Reset(false);
 	}
 	void Reset(bool Value)
 	{

@@ -3,7 +3,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "MapGraph.h"
+#include "BlockData.h"
 #include "RoomBlock.generated.h"
 
 class USectionShapeData;

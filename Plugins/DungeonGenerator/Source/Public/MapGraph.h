@@ -3,63 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BlockData.h"
+#include <FixedSize3DArray.h>
+
 #include "MapGraph.generated.h"
 
-USTRUCT(BlueprintType)
-struct FMapBlock
-{
-	GENERATED_USTRUCT_BODY()
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsUpBlocked;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsDownBlocked;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsLeftBlocked;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsRightBlocked;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsFrontBlocked;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsBackwardBlocked;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int Code;
-};
-
-USTRUCT(BlueprintType)
-struct FMapVector
-{
-	GENERATED_USTRUCT_BODY()
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int x;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int h;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int z;
-
-	bool operator==(const FMapVector& b) const
-	{
-		return x == b.x && h == b.h && z == b.z;
-	}
-	FMapVector operator+(const FMapVector& b) const
-	{
-		return {x+b.x, h+b.h, z+b.z};
-	}
-};
-
-USTRUCT(BlueprintType)
-struct FMapSection
-{
-	GENERATED_USTRUCT_BODY()
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FMapVector> SectionBlocks;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int EntranceCount = 1;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FMapVector Center;
-};
 /**
  * 
  */
@@ -68,10 +16,15 @@ class DUNGEONGENERATOR_API UMapGraph : public UObject
 {
 	GENERATED_BODY()
 public:
+	UPROPERTY()
+	U3DBoolArray* IsRoomExist;
+
+	FMapBlock GetBlock(FMapVector xhz);
 	UFUNCTION(BlueprintCallable)
 	FMapBlock GetBlock(int x, int h, int z);
 	UFUNCTION(BlueprintCallable)
 	void SetBlock(int x, int h, int z, FMapBlock BlockData);
+	void SetBlock(FMapVector xhz, FMapBlock BlockData);
 	void AddBlock(FMapBlock BlockData);
 	UFUNCTION(BlueprintCallable)
 	void SetSize(int x, int h, int z);
@@ -89,4 +42,5 @@ protected:
 	int Height = 1;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int ZWidth = 1;
+
 };

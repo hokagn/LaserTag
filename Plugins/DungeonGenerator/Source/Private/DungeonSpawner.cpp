@@ -3,7 +3,6 @@
 
 #include "DungeonSpawner.h"
 #include <RoomBlock.h>
-#define BASEROOMCODE -1
 
 void ADungeonSpawner::BeginPlay()
 {
@@ -15,53 +14,56 @@ void ADungeonSpawner::MakeMap()
 	RandomGenerator.Initialize(Seed);
 	CalcMaxHeightPerFloor();
 
-
 	ActiveMapGraph = NewObject<UMapGraph>();
 	ActiveMapGraph->SetSize(Size.x, Size.h, Size.z);
+
+	int RoomCode = BASEROOMCODE + 1;
+	while(true)
+	for (USectionShapeData* Data : SectionDatas)
+	{
+		if (SetSectionLocation(Data))
+		{
+			RoomCodeToSectionDataIndex.Add(RoomCode, SectionDatas.IndexOfByKey(Data));
+			InitSection(Data, CurrentOffset);
+			PlaceSection(Data, RoomCode);
+			MakeEntrance(Data, RoomCode);
+			RoomCode++;
+			CurrentOffset.x += Data->PosEnd.x;
+		}
+		else
+		{
+			goto BREAK;
+		}	
+	}
+
+	BREAK:
+
 	int Len = MaxHeightPerFloor.Num();
 	int TotalHeight = 0;
 	for (int Floor = 0; Floor < Len; Floor++)
 	{
 		for (int i = 0; i < Size.x; i++)
 			for (int j = 0; j < MaxHeightPerFloor[Floor]; j++)
-			{
 				for (int k = 0; k < Size.z; k++)
 				{
-					ActiveMapGraph->SetBlock(i, j + TotalHeight, k,
-						{
-						(MaxHeightPerFloor[Floor]-1 == j),
-						(j == 0),
-						(k == 0),
-						(k == Size.z - 1),
-						(i == Size.x - 1),
-						(i == 0),
-						BASEROOMCODE
-						}
-					);
+					FMapBlock CurBlock = ActiveMapGraph->GetBlock(i, j + TotalHeight, k);
+					if (CurBlock.Code == BASEROOMCODE)
+					{
+						ActiveMapGraph->SetBlock(i, j + TotalHeight, k,
+							FMapBlock(
+								(MaxHeightPerFloor[Floor] - 1 == j) || ActiveMapGraph->GetBlock(i, j + TotalHeight + 1, k).IsDownBlocked,
+								(j == 0) || ActiveMapGraph->GetBlock(i, j + TotalHeight - 1, k).IsUpBlocked,
+								(k == 0) || ActiveMapGraph->GetBlock(i, j + TotalHeight, k - 1).IsRightBlocked,
+								(k == Size.z - 1) || ActiveMapGraph->GetBlock(i, j + TotalHeight, k + 1).IsLeftBlocked,
+								(i == Size.x - 1) || ActiveMapGraph->GetBlock(i + 1, j + TotalHeight, k).IsBackwardBlocked,
+								(i == 0) || ActiveMapGraph->GetBlock(i - 1, j + TotalHeight, k).IsFrontBlocked,
+								BASEROOMCODE
+							)
+						);
+					}
 				}
-			}
 		TotalHeight += MaxHeightPerFloor[Floor];
 	}
-
-	int RoomCode = 0;
-	while(true)
-	for (USectionShapeData* Data : SectionDatas)
-	{
-		if (SetSectionLocation(Data))
-		{
-			RoomCodeToSectionDataIndex.Add(SectionDatas.IndexOfByKey(Data));
-			InitSection(Data, CurrentOffset);
-			PlaceSection(Data, RoomCode);
-			MakeEntrance(Data, RoomCode);
-			RoomCode++;
-		}
-		else
-		{
-			goto EndLoop;
-		}
-	}
-	EndLoop:
-
 
 	for (int j = 0; j < Size.h; j++)
 	{
@@ -83,29 +85,33 @@ void ADungeonSpawner::MakeMap()
 bool ADungeonSpawner::SetSectionLocation(USectionShapeData* Data)
 {
 	int NewX, NewZ;
-	switch (RandomGenerator.RandRange(0, 1))
+	NewX = CurrentOffset.x + abs(Data->NegEnd.x) + RandomGenerator.RandRange(0, 2) + 1;
+	if (NewX + Data->PosEnd.x < Size.x-1)
 	{
-	case 0:
-		NewX = CurrentOffset.x + Data->PosEnd.x + Data->NegEnd.x + RandomGenerator.RandRange(0, 2) + 1;
-		if (NewX < Size.x)
+		CurrentOffset.x = NewX;
+		CurrentOffset.z = FilledMap.z + Data->NegEnd.z + RandomGenerator.RandRange(-1, 1);
+		return true;
+	}
+	else
+	{
+		NewZ = FilledMap.z + abs(Data->NegEnd.z) + RandomGenerator.RandRange(0, 2) + 3;
+		if (NewZ + Data->PosEnd.z < Size.z-1)
 		{
-			CurrentOffset.x = NewX;
-			return true;
-		}
-	case 1:
-		NewZ = CurrentOffset.z + Data->PosEnd.z + Data->NegEnd.z + RandomGenerator.RandRange(0, 2) + 1;
-		if (NewZ < Size.z)
-		{
-			CurrentOffset.z = NewZ;
+			CurrentOffset.x = 1;
+			CurrentOffset.z = FMath::Max(FilledMap.z, NewZ);
+			FilledMap.z = NewZ + Data->PosEnd.z;
 			return true;
 		}
 	}
-	if(CurrentFloor < MaxHeightPerFloor.Num() - 2)
+	
+	if(CurrentFloor < MaxHeightPerFloor.Num() - 1)
 	{
 		CurrentOffset.h += MaxHeightPerFloor[CurrentFloor];
 		CurrentFloor++;
 		CurrentOffset.x = 1;
 		CurrentOffset.z = 1;
+		FilledMap.x = 1;
+		FilledMap.z = 1;
 		return SetSectionLocation(Data);
 	}
 	return false;
@@ -113,7 +119,7 @@ bool ADungeonSpawner::SetSectionLocation(USectionShapeData* Data)
 
 void ADungeonSpawner::SpawnBlock(int i, int j, int k)
 {
-	FVector Location = FVector(i * 400.0f, k * 400.0f, j * 400.0f);
+	FVector Location = FVector(i * 200.0f, k * 200.0f, j * 400.0f);
 	FMapBlock CurBlock = ActiveMapGraph->GetBlock(i, j, k);
 	UWorld* World = GetWorld();
 	FRotator Rotation = FRotator::ZeroRotator;
@@ -171,14 +177,15 @@ void ADungeonSpawner::PlaceSection(USectionShapeData* Section, int RoomCode)
 	for(FMapVector BlockToPlace : Section->SectionData.SectionBlocks)
 	{
 		FMapVector RealBlockLoc = BlockToPlace + Section->SectionOffset;
+
 		ActiveMapGraph->SetBlock(RealBlockLoc.x, RealBlockLoc.h, RealBlockLoc.z,
 			{ 
-				!(Section->GetIsOccupied(BlockToPlace.x, BlockToPlace.h + 1, BlockToPlace.z)),
-				!(Section->GetIsOccupied(BlockToPlace.x, BlockToPlace.h - 1, BlockToPlace.z)),
-				!(Section->GetIsOccupied(BlockToPlace.x, BlockToPlace.h, BlockToPlace.z - 1)),
-				!(Section->GetIsOccupied(BlockToPlace.x, BlockToPlace.h, BlockToPlace.z + 1)),
-				!(Section->GetIsOccupied(BlockToPlace.x + 1, BlockToPlace.h, BlockToPlace.z)),
-				!(Section->GetIsOccupied(BlockToPlace.x - 1, BlockToPlace.h, BlockToPlace.z)),
+				(Section->GetIsOccupied(BlockToPlace.x, BlockToPlace.h + 1, BlockToPlace.z)),
+				(Section->GetIsOccupied(BlockToPlace.x, BlockToPlace.h - 1, BlockToPlace.z)),
+				(Section->GetIsOccupied(BlockToPlace.x, BlockToPlace.h, BlockToPlace.z - 1)),
+				(Section->GetIsOccupied(BlockToPlace.x, BlockToPlace.h, BlockToPlace.z + 1)),
+				(Section->GetIsOccupied(BlockToPlace.x + 1, BlockToPlace.h, BlockToPlace.z)),
+				(Section->GetIsOccupied(BlockToPlace.x - 1, BlockToPlace.h, BlockToPlace.z)),
 
 				RoomCode 
 			});
@@ -214,9 +221,9 @@ void ADungeonSpawner::MakeEntrance(USectionShapeData* Section, int RoomCode)
 {
 	U3DBoolArray* DoorArray = NewObject<U3DBoolArray>();
 	DoorArray->SetSize(
-		Section->PosEnd.x + Section->NegEnd.x,
-		Section->PosEnd.h + Section->NegEnd.h,
-		Section->PosEnd.z + Section->NegEnd.z);
+		Section->PosEnd.x + Section->NegEnd.x + 3,
+		Section->PosEnd.h + Section->NegEnd.h + 3,
+		Section->PosEnd.z + Section->NegEnd.z + 3);
 	FMapVector AdjustedCenter = Section->SectionData.Center + Section->SectionOffset;
 	DoorArray->Reset(false);
 
@@ -227,44 +234,82 @@ void ADungeonSpawner::MakeEntrance(USectionShapeData* Section, int RoomCode)
 		do {
 			Shuffle.AddUnique(RandomGenerator.RandRange(0, Len - 1));
 		} while (Shuffle.Num() < Len);
-
+		const int FuncLen = 4;
+		TArray<int> FuncShuffle;
+		do {
+			FuncShuffle.AddUnique(RandomGenerator.RandRange(0, FuncLen - 1));
+		} while (FuncShuffle.Num() < FuncLen);
 		for (int j = 0; j < Len; j++)
 		{
 			FMapVector Rand = Section->SectionData.SectionBlocks[Shuffle[j]];
-			if (Section->GetIsOccupied(Rand.x, Rand.h, Rand.z) &&
-					(
-						//Short-Circuit Evaluation
-						MakeDoorIfConnectedToOthers(Section, Rand, DoorArray, AdjustedCenter, { 0,0,-1 }) ||
-						MakeDoorIfConnectedToOthers(Section, Rand, DoorArray, AdjustedCenter, { 0,0,1 }) ||
-						MakeDoorIfConnectedToOthers(Section, Rand, DoorArray, AdjustedCenter, { 1,0,0 }) ||
-						MakeDoorIfConnectedToOthers(Section, Rand, DoorArray, AdjustedCenter, { -1,0,0 })
-					)
-				)
-			{
-				break;
-			}
-			
+			if (DoorArray->Get(Rand.x, Rand.h, Rand.z) || Rand.h != 0)continue;
+				for (int k = 0; k < FuncLen; k++)
+				{
+					switch (FuncShuffle[k])
+					{
+					case 0:
+						if (MakeDoorIfConnectedToOthers(Section, Rand, DoorArray, AdjustedCenter, { 0,0,-1 }))goto BREAK;
+						break;
+					case 1:
+						if(MakeDoorIfConnectedToOthers(Section, Rand, DoorArray, AdjustedCenter, { 0,0,1 }))goto BREAK;
+						break;
+					case 2:
+						if(MakeDoorIfConnectedToOthers(Section, Rand, DoorArray, AdjustedCenter, { 1,0,0 }))goto BREAK;
+						break;
+					case 3:
+						if(MakeDoorIfConnectedToOthers(Section, Rand, DoorArray, AdjustedCenter, { -1,0,0 }))goto BREAK;
+						break;
+					}
+					
+				}
 		}
+	BREAK:
+		1; // expression for goto
 	}
 }
 
 bool ADungeonSpawner::MakeDoorIfConnectedToOthers(USectionShapeData* Section, FMapVector& Rand, U3DBoolArray* DoorArray, FMapVector& AdjustedCenter, FMapVector Offset)
 {
-	if (!(Section->GetIsOccupied(Rand + Offset)))
+	FMapVector Loc = AdjustedCenter + Offset + Rand;
+	if (Loc.x < 0 || Loc.h < 0 || Loc.z < 0 ||
+		Loc.x > Size.z || Loc.z > Size.z || Loc.z > Size.z)
 	{
-		DoorArray->Set(Rand.x + Section->NegEnd.x, Rand.h + Section->NegEnd.h, Rand.z + Section->NegEnd.z, true);
-		MakeDoor(Rand, AdjustedCenter);
+		return false;
+	}
+	if (ActiveMapGraph->GetBlock(Loc).Code != ActiveMapGraph->GetBlock(AdjustedCenter + Rand).Code)
+	{
+		DoorArray->Set(Rand.x + AdjustedCenter.x, Rand.h + AdjustedCenter.h, Rand.z + AdjustedCenter.z, true);
+		MakeDoor(Rand, AdjustedCenter, Offset);
 		return true;
 	}
 	return false;
 }
 
-void ADungeonSpawner::MakeDoor(FMapVector& Rand, FMapVector& AdjustedCenter)
+void ADungeonSpawner::MakeDoor(FMapVector& Rand, FMapVector& AdjustedCenter, FMapVector& Offset)
 {
-	FMapBlock Block1 = ActiveMapGraph->GetBlock(Rand.x + AdjustedCenter.x, Rand.h + AdjustedCenter.h, Rand.z + AdjustedCenter.z);
-	FMapBlock Block2 = ActiveMapGraph->GetBlock(Rand.x + AdjustedCenter.x, Rand.h + AdjustedCenter.h, Rand.z + AdjustedCenter.z - 1);
-	Block1.IsLeftBlocked = false;
-	Block2.IsRightBlocked = false;
+	FMapBlock Block1 = ActiveMapGraph->GetBlock(Rand + AdjustedCenter);
+	FMapBlock Block2 = ActiveMapGraph->GetBlock(Rand + AdjustedCenter + Offset);
+	if (Offset.x == 1)
+	{
+		Block1.IsFrontBlocked = false;
+		Block2.IsBackwardBlocked = false;
+	}
+	else if (Offset.x == -1)
+	{
+		Block1.IsBackwardBlocked = false;
+		Block2.IsFrontBlocked = false;
+	}
+	if (Offset.z == 1)
+	{
+		Block1.IsRightBlocked = false;
+		Block2.IsLeftBlocked = false;
+	}
+	else if (Offset.z == -1)
+	{
+		Block1.IsLeftBlocked = false;
+		Block2.IsRightBlocked = false;
+	}
+
 	ActiveMapGraph->SetBlock(Rand.x + AdjustedCenter.x, Rand.h + AdjustedCenter.h, Rand.z + AdjustedCenter.z, Block1);
-	ActiveMapGraph->SetBlock(Rand.x + AdjustedCenter.x, Rand.h + AdjustedCenter.h, Rand.z + AdjustedCenter.z - 1, Block2);
+	ActiveMapGraph->SetBlock(Rand + AdjustedCenter + Offset, Block2);
 }

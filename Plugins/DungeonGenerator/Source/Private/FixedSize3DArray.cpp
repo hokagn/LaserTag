@@ -8,7 +8,7 @@ bool U3DBoolArray::Get(int i, int j, int k)
     int Index = i + Size.x * j + Size.x * Size.h * k;
     if (Data.Max() <= Index)
     {
-        Data.Init(false, Index + 1);
+        return false;
     }
     return Data[Index];
 }
@@ -18,7 +18,7 @@ bool U3DBoolArray::Set(int i, int j, int k, bool Value)
     int Index = i + Size.x * j + Size.x * Size.h * k;
     if (Data.Max() <= Index)
     {
-        Data.Init(false, Index + 1);
+        return false;
     }
     Data[Index] = Value;
     return true;

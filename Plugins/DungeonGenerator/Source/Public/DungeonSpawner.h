@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include <SectionShapeData.h>
+#include "BlockData.h"
 #include "Math/RandomStream.h"
 #include "DungeonSpawner.generated.h"
 
@@ -37,12 +38,14 @@ protected:
 	void InitSection(USectionShapeData* Section, const FMapVector& Offset);
 	void MakeEntrance(USectionShapeData* Section, int RoomCode);
 	bool MakeDoorIfConnectedToOthers(USectionShapeData* Section, FMapVector& Rand, U3DBoolArray* DoorArray, FMapVector& AdjustedCenter, FMapVector Offset);
-	void MakeDoor(FMapVector& Rand, FMapVector& AdjustedCenter);
+	void MakeDoor(FMapVector& Rand, FMapVector& AdjustedCenter, FMapVector& Offset);
 	void SpawnSectionObjects(USectionShapeData* Section);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<int>MaxHeightPerFloor;
-	TArray<long int>RoomCodeToSectionDataIndex;
+	TMap<long, int>RoomCodeToSectionDataIndex;
 	FRandomStream RandomGenerator;
 	UMapGraph* ActiveMapGraph;
-	FMapVector CurrentOffset = {1,0,1};
+	FMapVector CurrentOffset = { 1,0,1 };
+	FMapVector FilledMap = {1,0,1};
 	int CurrentFloor = 0;
 };
